@@ -7,6 +7,7 @@ import os # operating system library that allows us to access the computer's fil
 import openai # library used to access the OpenAI API // librería usada para acceder a la API de OpenAI
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters # library used to communicate with the Telegram bot // librería usada para comunicarse con el bot de Telegram
 import config # import the config file // importar el archivo de configuración
+import org_data # import the org_data file // importar el archivo org_data
 
 # set the OpenAI API key, so the code can access the API // establecer la clave de la API de OpenAI, para que el código pueda acceder a la API
 openai.api_key = config.openai_api_key
@@ -94,11 +95,21 @@ def handle_audio(update, context):
     #delete the wav file // eliminar el archivo wav
     os.remove(wav_audio.name)
 
+# send a message saying Malu Tecera's skills. get the data from org_data.py // enviar un mensaje diciendo las habilidades de Malu Tecera. obtener los datos de org_data.py
+def send_skills(update, context):
+    # get the skills from org_data.py // obtener las habilidades de org_data.py
+    skills = org_data.personas['Malu Tecera']
+    # send the skills to the user // enviar las habilidades al usuario
+    update.message.reply_text(skills)
+
 # updater is used to communicate with the Telegram bot // updater se usa para comunicarse con el bot de Telegram
 updater = Updater(config.telegram_api_key) 
 
 # set the handler for audio files // establecer el manejador para archivos de audio
 updater.dispatcher.add_handler(MessageHandler(Filters.audio, handle_audio))
+
+# set the handler for the /skills command // establecer el manejador para el comando /skills
+updater.dispatcher.add_handler(CommandHandler('skills', send_skills))
 
 # start the bot // iniciar el bot
 updater.start_polling()
