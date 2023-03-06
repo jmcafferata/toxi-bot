@@ -8,6 +8,8 @@ import openai # library used to access the OpenAI API // librería usada para ac
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters # library used to communicate with the Telegram bot // librería usada para comunicarse con el bot de Telegram
 import config # import the config file // importar el archivo de configuración
 import org_data # import the org_data file // importar el archivo org_data
+import csv # library used to read and write csv files // librería usada para leer y escribir archivos csv
+import pandas as pd # library used to read and write csv files // librería usada para leer y escribir archivos csv
 
 # set the OpenAI API key, so the code can access the API // establecer la clave de la API de OpenAI, para que el código pueda acceder a la API
 openai.api_key = config.openai_api_key
@@ -95,12 +97,21 @@ def handle_audio(update, context):
     #delete the wav file // eliminar el archivo wav
     os.remove(wav_audio.name)
 
-# send a message saying Malu Tecera's skills. get the data from org_data.py // enviar un mensaje diciendo las habilidades de Malu Tecera. obtener los datos de org_data.py
-def send_skills(update, context):
-    # get the skills from org_data.py // obtener las habilidades de org_data.py
-    skills = org_data.personas['Malu Tecera']
-    # send the skills to the user // enviar las habilidades al usuario
-    update.message.reply_text(skills)
+# when someone sends text to the bot, the message is added to messages.csv, including date and sender // cuando alguien envía texto al bot, el mensaje se agrega a messages.csv, incluyendo fecha y remitente
+def handle_text(update, context):
+    # get the text from the message // obtener el texto del mensaje
+    text = update.message.text
+    # get the date from the message // obtener la fecha del mensaje
+    date = update.message.date
+    # get the sender from the message // obtener el remitente del mensaje
+    sender = update.message.from_user.username
+    
+
+    # add the message to the csv file encoded in UTF-8 // agregar el mensaje al archivo csv codificado en UTF-8
+    with open('messages.csv', 'a', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow([date, sender, text,])
+    
 
 # updater is used to communicate with the Telegram bot // updater se usa para comunicarse con el bot de Telegram
 updater = Updater(config.telegram_api_key) 
@@ -108,9 +119,8 @@ updater = Updater(config.telegram_api_key)
 # set the handler for audio files // establecer el manejador para archivos de audio
 updater.dispatcher.add_handler(MessageHandler(Filters.audio, handle_audio))
 
-# set the handler for the /skills command // establecer el manejador para el comando /skills
-updater.dispatcher.add_handler(CommandHandler('skills', send_skills))
-
+# set the handler for text messages
+updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_text))
 # start the bot // iniciar el bot
 updater.start_polling()
 
