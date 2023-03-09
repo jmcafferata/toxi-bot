@@ -10,6 +10,9 @@ import config # import the config file // importar el archivo de configuración
 import org_data # import the org_data file // importar el archivo org_data
 import csv # library used to read and write csv files // librería usada para leer y escribir archivos csv
 import pandas as pd # library used to read and write csv files // librería usada para leer y escribir archivos csv
+import logging # library used to log errors // librería usada para registrar errores
+from requests import * # library used to make HTTP requests // librería usada para realizar solicitudes HTTP
+from telegram import * # library used to communicate with the Telegram bot // librería usada para comunicarse con el bot de Telegram
 
 # set the OpenAI API key, so the code can access the API // establecer la clave de la API de OpenAI, para que el código pueda acceder a la API
 openai.api_key = config.openai_api_key
@@ -99,6 +102,12 @@ def handle_audio(update, context):
 
 # when someone sends text to the bot, the message is added to messages.csv, including date and sender // cuando alguien envía texto al bot, el mensaje se agrega a messages.csv, incluyendo fecha y remitente
 def handle_text(update, context):
+    if "Whatsapp" in update.message.text:
+        update.message.reply_text("Pegá mensajes de Whatsapp y lo voy a procesar. ¡Máximo 600 caracteres!")
+        return
+    if "Audios" in update.message.text:
+        update.message.reply_text("Mandame audios y lo voy a procesar. ¡Máximo 60 segundos!")
+        return
     # get the text from the message // obtener el texto del mensaje
     text = update.message.text
     # get the date from the message // obtener la fecha del mensaje
@@ -112,15 +121,28 @@ def handle_text(update, context):
         writer = csv.writer(f)
         writer.writerow([date, sender, text,])
     
+def start(update, context):
+    buttons = [[InlineKeyboardButton("Whatsapp",callback_data="Whatsapp"), InlineKeyboardButton("Audios",callback_data="Audios")]]
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Buenas, necesito aprender sobre vos. ¿Querés mandarme audios o pasarme mensajes de Whatsapp?", reply_markup=ReplyKeyboardMarkup(buttons, one_time_keyboard=True))
 
 # updater is used to communicate with the Telegram bot // updater se usa para comunicarse con el bot de Telegram
 updater = Updater(config.telegram_api_key) 
 
+# dispatcher is used to handle the messages // dispatcher se usa para manejar los mensajes
+dispatcher = updater.dispatcher
+
+# set the logging level // establecer el nivel de registro
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+# set the handler for the /start command // establecer el manejador para el comando /start
+dispatcher.add_handler(CommandHandler("start", start))
+
 # set the handler for audio files // establecer el manejador para archivos de audio
-updater.dispatcher.add_handler(MessageHandler(Filters.audio, handle_audio))
+dispatcher.add_handler(MessageHandler(Filters.audio, handle_audio))
 
 # set the handler for text messages
-updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_text))
+dispatcher.add_handler(MessageHandler(Filters.text, handle_text))
+
 # start the bot // iniciar el bot
 updater.start_polling()
 
