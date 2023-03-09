@@ -5,17 +5,38 @@
 # import the necessary libraries // importar las librerías necesarias
 import os # operating system library that allows us to access the computer's file system // librería del sistema operativo que nos permite acceder al sistema de archivos del computador
 import openai # library used to access the OpenAI API // librería usada para acceder a la API de OpenAI
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters # library used to communicate with the Telegram bot // librería usada para comunicarse con el bot de Telegram
 import config # import the config file // importar el archivo de configuración
 import org_data # import the org_data file // importar el archivo org_data
 import csv # library used to read and write csv files // librería usada para leer y escribir archivos csv
 import pandas as pd # library used to read and write csv files // librería usada para leer y escribir archivos csv
 import logging # library used to log errors // librería usada para registrar errores
 from requests import * # library used to make HTTP requests // librería usada para realizar solicitudes HTTP
-from telegram import * # library used to communicate with the Telegram bot // librería usada para comunicarse con el bot de Telegram
+from telegram import __version__ as TG_VER # import the telegram version // importar la versión de telegram
+# Import the necessary classes from the telegram.ext library // Importar las clases necesarias de la biblioteca telegram.ext
+try:
+    from telegram import __version_info__
+except ImportError:
+    __version_info__ = (0, 0, 0, 0, 0)  # type: ignore[assignment]
+
+if __version_info__ < (20, 0, 0, "alpha", 1):
+    raise RuntimeError(
+        f"This example is not compatible with your current PTB version {TG_VER}. To view the "
+        f"{TG_VER} version of this example, "
+        f"visit https://docs.python-telegram-bot.org/en/v{TG_VER}/examples.html"
+    )
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler
 
 # set the OpenAI API key, so the code can access the API // establecer la clave de la API de OpenAI, para que el código pueda acceder a la API
 openai.api_key = config.openai_api_key
+
+# set the logging level // establecer el nivel de registro
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+# create the logger // crear el registrador
+logger = logging.getLogger(__name__)
 
 # decoding means converting the bytes (0s and 1s) into a string // la decodificación significa convertir los bytes (0s y 1s) en una cadena de texto
 def decode_utf8(text: bytes) -> str: 
@@ -121,31 +142,54 @@ def handle_text(update, context):
         writer = csv.writer(f)
         writer.writerow([date, sender, text,])
     
-def start(update, context):
-    buttons = [[InlineKeyboardButton("Whatsapp",callback_data="Whatsapp"), InlineKeyboardButton("Audios",callback_data="Audios")]]
-    context.bot.send_message(chat_id=update.effective_chat.id, text="Buenas, necesito aprender sobre vos. ¿Querés mandarme audios o pasarme mensajes de Whatsapp?", reply_markup=ReplyKeyboardMarkup(buttons, one_time_keyboard=True))
+async def start(update, context):
+    # creates a keyboard of buttons // crea un teclado de botones
+    keyboard = [
+        [
+            InlineKeyboardButton("Whatsapp",callback_data="Whatsapp"), 
+            InlineKeyboardButton("Audios",callback_data="Audios")
+        ]
+    ]
+    # creates the keyboard markup // crea el markup del teclado
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-# updater is used to communicate with the Telegram bot // updater se usa para comunicarse con el bot de Telegram
-updater = Updater(config.telegram_api_key) 
+    # sends the message with the keyboard markup // envía el mensaje con el markup del teclado
+    await update.message.reply_text("Querés que procese mensajes de Whatsapp o audios?", reply_markup=reply_markup)
 
-# dispatcher is used to handle the messages // dispatcher se usa para manejar los mensajes
-dispatcher = updater.dispatcher
+async def button(update, context):
 
-# set the logging level // establecer el nivel de registro
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+    # get the callback data // obtener los datos de devolución de llamada
+    query = update.callback_query
 
-# set the handler for the /start command // establecer el manejador para el comando /start
-dispatcher.add_handler(CommandHandler("start", start))
+    # CallbackQueries need to be answered, even if no notification to the user is needed
+    # Some clients may have trouble otherwise. See https://core.telegram.org/bots/api#callbackquery
+    await query.answer()
 
-# set the handler for audio files // establecer el manejador para archivos de audio
-dispatcher.add_handler(MessageHandler(Filters.audio, handle_audio))
+    await query.edit_message_text(text=f"Selected option: {query.data}")
 
-# set the handler for text messages
-dispatcher.add_handler(MessageHandler(Filters.text, handle_text))
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    
+    # send a message when the command /help is issued // enviar un mensaje cuando se emite el comando /help
+    await update.message.reply_text("Enviá /start para comenzar a usar el bot.")
 
-# start the bot // iniciar el bot
-updater.start_polling()
+def main() -> None:
 
-# keep the code running // mantener el código en ejecución
-updater.idle()
+    # Create the Updater and pass it your bot's token. // Crear el actualizador y pasarle el token de su bot.
+    application = Application.builder().token(config.telegram_api_key).build()
+
+    # set the handler for the /start command // establecer el manejador para el comando /start
+    application.add_handler(CommandHandler("start", start))
+
+    # set the handler for the buttons // establecer el manejador para los botones
+    application.add_handler(CallbackQueryHandler(button))
+    
+    # set the handler for the /help command // establecer el manejador para el comando /help
+    application.add_handler(CommandHandler("help", help_command))
+
+    # start the bot // iniciar el bot
+    application.run_polling()
+
+
+if __name__ == '__main__':
+    main()
 
